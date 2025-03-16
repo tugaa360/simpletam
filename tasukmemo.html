@@ -1,0 +1,231 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>タスク＆アイデア</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        #app {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #tasks, #ideas {
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            border-bottom: 1px solid #ccc;
+            padding: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .completed {
+            text-decoration: line-through;
+        }
+
+        @media (min-width: 768px) {
+            #app {
+                flex-direction: row;
+            }
+
+            #tasks, #ideas {
+                width: 50%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="tasks">
+            <h2>タスク</h2>
+            <input type="text" id="taskInput" placeholder="新しいタスク">
+            <input type="date" id="taskDueDate">
+            <input type="time" id="taskDueTime">
+            <div>
+                <button id="addTask">追加</button>
+                <button id="startTaskRecording">タスク録音開始</button>
+                <button id="stopTaskRecording" disabled>タスク録音停止</button>
+            </div>
+            <ul id="taskList"></ul>
+        </div>
+        <div id="ideas">
+            <h2>アイデア</h2>
+            <textarea id="ideaInput" placeholder="新しいアイデア"></textarea>
+            <div>
+                <button id="addIdea">追加</button>
+                <button id="startIdeaRecording">アイデア録音開始</button>
+                <button id="stopIdeaRecording" disabled>アイデア録音停止</button>
+            </div>
+            <ul id="ideaList"></ul>
+        </div>
+    </div>
+
+    <script>
+        const taskInput = document.getElementById('taskInput');
+        const taskDueDateInput = document.getElementById('taskDueDate');
+        const taskDueTimeInput = document.getElementById('taskDueTime');
+        const addTaskButton = document.getElementById('addTask');
+        const taskList = document.getElementById('taskList');
+        const ideaInput = document.getElementById('ideaInput');
+        const addIdeaButton = document.getElementById('addIdea');
+        const ideaList = document.getElementById('ideaList');
+        const startTaskRecordingButton = document.getElementById('startTaskRecording');
+        const stopTaskRecordingButton = document.getElementById('stopTaskRecording');
+        const startIdeaRecordingButton = document.getElementById('startIdeaRecording');
+        const stopIdeaRecordingButton = document.getElementById('stopIdeaRecording');
+
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        let ideas = JSON.parse(localStorage.getItem('ideas')) || [];
+        let taskAudioChunks = [];
+        let taskMediaRecorder;
+        let ideaAudioChunks = [];
+        let ideaMediaRecorder;
+
+        const recognition = new webkitSpeechRecognition() || new SpeechRecognition();
+        recognition.lang = 'ja-JP';
+        recognition.interimResults = true;
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+            tasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                let audioPlayer = '';
+                if (task.audioData) {
+                    const audioUrl = URL.createObjectURL(task.audioData);
+                    audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
+                }
+                li.innerHTML = `
+                    <input type="checkbox" id="task-${index}" <span class="math-inline">\{task\.completed ? 'checked' \: ''\}\>
+<label for\="task\-</span>{index}" class="<span class="math-inline">\{task\.completed ? 'completed' \: ''\}"\></span>{task.text} (${task.dueDate} ${task.dueTime})</label>
+                    <span class="math-inline">\{audioPlayer\}
+<button class\="delete\-task" data\-index\="</span>{index}">削除</button>
+                `;
+                taskList.appendChild(li);
+            });
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        function renderIdeas() {
+            ideaList.innerHTML = '';
+            ideas.forEach((idea, index) => {
+                const li = document.createElement('li');
+                let audioPlayer = '';
+                if (idea.audioData) {
+                    const audioUrl = URL.createObjectURL(idea.audioData);
+                    audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
+                }
+                li.innerHTML = `
+                    <span>${idea.text || idea}</span>
+                    <span class="math-inline">\{audioPlayer\}
+<button class\="delete\-idea" data\-index\="</span>{index}">削除</button>
+                `;
+                ideaList.appendChild(li);
+            });
+            localStorage.setItem('ideas', JSON.stringify(ideas));
+        }
+
+        addTaskButton.addEventListener('click', () => {
+            const task = taskInput.value.trim();
+            const dueDate = taskDueDateInput.value;
+            const dueTime = taskDueTimeInput.value;
+            if (task) {
+                tasks.push({ text: task, completed: false, dueDate: dueDate, dueTime: dueTime, audioData: null });
+                taskInput.value = '';
+                taskDueDateInput.value = '';
+                taskDueTimeInput.value = '';
+                renderTasks();
+            }
+        });
+
+        addIdeaButton.addEventListener('click', () => {
+            const idea = ideaInput.value.trim();
+            if (idea) {
+                ideas.push({ text: idea, audioData: null });
+                ideaInput.value = '';
+                renderIdeas();
+            }
+        });
+
+        taskList.addEventListener('change', (event) => {
+            if (event.target.type === 'checkbox') {
+                const index = event.target.id.split('-')[1];
+                tasks[index].completed = event.target.checked;
+                renderTasks();
+            }
+        });
+
+        taskList.addEventListener('click', (event) => {
+            if (event.target.classList.contains('delete-task')) {
+                const index = event.target.dataset.index;
+                tasks.splice(index, 1);
+                renderTasks();
+            }
+        });
+
+        ideaList.addEventListener('click', (event) => {
+            if (event.target.classList.contains('delete-idea')) {
+                const index = event.target.dataset.index;
+                ideas.splice(index, 1);
+                renderIdeas();
+            }
+        });
+
+        startTaskRecordingButton.addEventListener('click', async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            taskMediaRecorder = new MediaRecorder(stream);
+            taskMediaRecorder.ondataavailable = event => {
+                taskAudioChunks.push(event.data);
+            };
+            taskMediaRecorder.onstop = () => {
+                const audioBlob = new Blob(taskAudioChunks, { type: 'audio/wav' });
+                const lastTask = tasks[tasks.length - 1];
+                if (lastTask) {
+                    lastTask.audioData = audioBlob;
+                    renderTasks();
+                }
+                taskAudioChunks = [];
+            };
+            taskMediaRecorder.start();
+            startTaskRecordingButton.disabled = true;
+            stopTaskRecordingButton.disabled = false;
+        });
+
+        stopTaskRecordingButton.addEventListener('click', () => {
+            taskMediaRecorder.stop();
+            startTaskRecordingButton.disabled = false;
+            stopTaskRecordingButton.disabled = true;
+        });
+
+        startIdeaRecordingButton.addEventListener('click', async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            ideaMediaRecorder = new MediaRecorder(stream);
+            ideaMediaRecorder.ondataavailable = event => {
+                ideaAudioChunks.push(event.data);
+            };
+            ideaMediaRecorder.onstop = () => {
+                const audioBlob = new Blob(ideaAudioChunks, { type: 'audio/wav' });
+                const lastIdea = ideas[ideas.length - 1];
+                if (lastIdea) {
+                    lastIdea.audioData = audioBlob;
+                    renderIdeas();
+                }
+                ideaAudioChunks = [];
+            };
+            ideaMediaRecorder.start();
+            startIdeaRecordingButton.disabled = true;
+            stopIdeaRecordingButton.disabled = false;
+        });
+
+        stopIdeaRecordingButton.addEventListener('click', () => {
+            ideaMediaRecorder.stop();
+            startIdeaRecordingButton.disabled = false;
+            stopIdeaRecordingButton.disabled
