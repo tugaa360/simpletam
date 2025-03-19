@@ -1,44 +1,184 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <title>タスク＆アイデア</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            color: #333;
+        }
         #app {
             display: flex;
             flex-direction: column;
-        }
-
-        #tasks, #ideas {
-            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             padding: 20px;
             box-sizing: border-box;
         }
-
+        #tasks, #ideas {
+            width: 100%;
+            padding: 20px 0;
+            box-sizing: border-box;
+        }
+        #tasks h2, #ideas h2 {
+            margin-top: 0;
+            color: #4CAF50;
+            text-align: center;
+        }
         ul {
             list-style: none;
             padding: 0;
         }
-
         li {
-            border-bottom: 1px solid #ccc;
-            padding: 5px 0;
+            border-bottom: 1px solid #ddd;
+            padding: 10px 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 16px;
+            color: #555;
         }
-
+        li:last-child {
+            border-bottom: none;
+        }
         .completed {
             text-decoration: line-through;
+            color: #aaa;
         }
-
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        textarea,
+        select {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+        }
+        textarea {
+            resize: vertical;
+            height: 80px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+            margin: 5px 0;
+            font-family: 'Inter', sans-serif;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ddd;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+        .delete-task, .delete-idea {
+            background-color: #f44336;
+            color: white;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .delete-task:hover, .delete-idea:hover {
+            background-color: #d32f2f;
+        }
+        audio {
+            margin-top: 10px;
+        }
+        #archivedTasks {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f8f8;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #archivedTasks h2 {
+            color: #4CAF50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #archivedTaskList {
+            list-style: none;
+            padding: 0;
+        }
+        #archivedTaskList li {
+            border-bottom: 1px solid #ddd;
+            padding: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+            color: #555;
+        }
+        #archivedTaskList li:last-child {
+            border-bottom: none;
+        }
+        .archived-section {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+        }
+        .archived-section h3 {
+            margin-top: 0;
+            color: #4CAF50;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        #ideaList {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        #ideaList li {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            width: calc(33.33% - 20px);
+            box-sizing: border-box;
+            margin-bottom: 10px;
+            flex-direction: column;
+        }
+        #ideaList li span {
+            margin-bottom: 5px;
+            display: block;
+        }
+        @media (max-width: 768px) {
+            #ideaList li {
+                width: calc(50% - 20px);
+            }
+        }
+        @media (max-width: 480px) {
+            #ideaList li {
+                width: calc(100% - 20px);
+            }
+        }
         @media (min-width: 768px) {
             #app {
                 flex-direction: row;
             }
-
             #tasks, #ideas {
                 width: 50%;
+                padding: 20px;
             }
         }
     </style>
@@ -50,6 +190,11 @@
             <input type="text" id="taskInput" placeholder="新しいタスク">
             <input type="date" id="taskDueDate">
             <input type="time" id="taskDueTime">
+            <select id="taskPriority">
+                <option value="high">高</option>
+                <option value="medium" selected>中</option>
+                <option value="low">低</option>
+            </select>
             <div>
                 <button id="addTask">追加</button>
                 <button id="startTaskRecording">タスク録音開始</button>
@@ -68,11 +213,15 @@
             <ul id="ideaList"></ul>
         </div>
     </div>
-
+    <div id="archivedTasks">
+        <h2>完了したタスク</h2>
+        <div id="archivedTaskList"></div>
+    </div>
     <script>
         const taskInput = document.getElementById('taskInput');
         const taskDueDateInput = document.getElementById('taskDueDate');
         const taskDueTimeInput = document.getElementById('taskDueTime');
+        const taskPriorityInput = document.getElementById('taskPriority');
         const addTaskButton = document.getElementById('addTask');
         const taskList = document.getElementById('taskList');
         const ideaInput = document.getElementById('ideaInput');
@@ -82,15 +231,17 @@
         const stopTaskRecordingButton = document.getElementById('stopTaskRecording');
         const startIdeaRecordingButton = document.getElementById('startIdeaRecording');
         const stopIdeaRecordingButton = document.getElementById('stopIdeaRecording');
+        const archivedTaskList = document.getElementById('archivedTaskList');
 
         let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
         let ideas = JSON.parse(localStorage.getItem('ideas')) || [];
+        let archivedTasks = JSON.parse(localStorage.getItem('archivedTasks')) || [];
         let taskAudioChunks = [];
         let taskMediaRecorder;
         let ideaAudioChunks = [];
         let ideaMediaRecorder;
 
-        const recognition = new webkitSpeechRecognition() || new SpeechRecognition();
+        const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
         recognition.lang = 'ja-JP';
         recognition.interimResults = true;
 
@@ -104,10 +255,10 @@
                     audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
                 }
                 li.innerHTML = `
-                    <input type="checkbox" id="task-${index}" <span class="math-inline">\{task\.completed ? 'checked' \: ''\}\>
-<label for\="task\-</span>{index}" class="<span class="math-inline">\{task\.completed ? 'completed' \: ''\}"\></span>{task.text} (${task.dueDate} ${task.dueTime})</label>
-                    <span class="math-inline">\{audioPlayer\}
-<button class\="delete\-task" data\-index\="</span>{index}">削除</button>
+                    <input type="checkbox" id="task-${index}" ${task.completed ? 'checked' : ''}>
+                    <label for="task-${index}" class="${task.completed ? 'completed' : ''}">${task.text} (${task.dueDate} ${task.dueTime}) - ${task.priority}</label>
+                    ${audioPlayer}
+                    <button class="delete-task" data-index="${index}">削除</button>
                 `;
                 taskList.appendChild(li);
             });
@@ -125,23 +276,58 @@
                 }
                 li.innerHTML = `
                     <span>${idea.text || idea}</span>
-                    <span class="math-inline">\{audioPlayer\}
-<button class\="delete\-idea" data\-index\="</span>{index}">削除</button>
+                    ${audioPlayer}
+                    <button class="delete-idea" data-index="${index}">削除</button>
                 `;
                 ideaList.appendChild(li);
             });
             localStorage.setItem('ideas', JSON.stringify(ideas));
         }
 
+        function renderArchivedTasks() {
+            archivedTaskList.innerHTML = '';
+            const groupedTasks = {};
+
+            archivedTasks.forEach(task => {
+                const completionDate = task.completionDate || '未設定';
+                if (!groupedTasks[completionDate]) {
+                    groupedTasks[completionDate] = [];
+                }
+                groupedTasks[completionDate].push(task);
+            });
+
+            for (const date in groupedTasks) {
+                const section = document.createElement('div');
+                section.className = 'archived-section';
+                section.innerHTML = `<h3>${date}</h3>`;
+                const ul = document.createElement('ul');
+                groupedTasks[date].forEach(task => {
+                    const li = document.createElement('li');
+                    let audioPlayer = '';
+                    if (task.audioData) {
+                        const audioUrl = URL.createObjectURL(task.audioData);
+                        audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
+                    }
+                    li.innerHTML = `<span class="completed">${task.text} (${task.dueDate} ${task.dueTime}) - ${task.priority}</span> ${audioPlayer}`;
+                    ul.appendChild(li);
+                });
+                section.appendChild(ul);
+                archivedTaskList.appendChild(section);
+            }
+            localStorage.setItem('archivedTasks', JSON.stringify(archivedTasks));
+        }
+
         addTaskButton.addEventListener('click', () => {
             const task = taskInput.value.trim();
             const dueDate = taskDueDateInput.value;
             const dueTime = taskDueTimeInput.value;
+            const priority = taskPriorityInput.value;
             if (task) {
-                tasks.push({ text: task, completed: false, dueDate: dueDate, dueTime: dueTime, audioData: null });
+                tasks.push({ text: task, completed: false, dueDate: dueDate, dueTime: dueTime, priority: priority, audioData: null });
                 taskInput.value = '';
                 taskDueDateInput.value = '';
                 taskDueTimeInput.value = '';
+                taskPriorityInput.value = 'medium';
                 renderTasks();
             }
         });
@@ -158,8 +344,15 @@
         taskList.addEventListener('change', (event) => {
             if (event.target.type === 'checkbox') {
                 const index = event.target.id.split('-')[1];
-                tasks[index].completed = event.target.checked;
+                const task = tasks[index];
+                task.completed = event.target.checked;
+                if (task.completed) {
+                    task.completionDate = new Date().toLocaleDateString();
+                    archivedTasks.push(task);
+                    tasks.splice(index, 1);
+                }
                 renderTasks();
+                renderArchivedTasks();
             }
         });
 
@@ -180,52 +373,89 @@
         });
 
         startTaskRecordingButton.addEventListener('click', async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            taskMediaRecorder = new MediaRecorder(stream);
-            taskMediaRecorder.ondataavailable = event => {
-                taskAudioChunks.push(event.data);
-            };
-            taskMediaRecorder.onstop = () => {
-                const audioBlob = new Blob(taskAudioChunks, { type: 'audio/wav' });
-                const lastTask = tasks[tasks.length - 1];
-                if (lastTask) {
-                    lastTask.audioData = audioBlob;
-                    renderTasks();
-                }
-                taskAudioChunks = [];
-            };
-            taskMediaRecorder.start();
-            startTaskRecordingButton.disabled = true;
-            stopTaskRecordingButton.disabled = false;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                taskMediaRecorder = new MediaRecorder(stream);
+                taskMediaRecorder.ondataavailable = event => {
+                    taskAudioChunks.push(event.data);
+                };
+                taskMediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(taskAudioChunks, { type: 'audio/wav' });
+                    const lastTask = tasks[tasks.length - 1];
+                    if (lastTask) {
+                        lastTask.audioData = audioBlob;
+                        renderTasks();
+                    }
+                    taskAudioChunks = [];
+                };
+                taskMediaRecorder.start();
+                startTaskRecordingButton.disabled = true;
+                stopTaskRecordingButton.disabled = false;
+            } catch (error) {
+                console.error("Error starting task recording:", error);
+                alert('マイクへのアクセスを許可してください。');
+            }
         });
 
         stopTaskRecordingButton.addEventListener('click', () => {
-            taskMediaRecorder.stop();
+            if (taskMediaRecorder) {
+                taskMediaRecorder.stop();
+            }
             startTaskRecordingButton.disabled = false;
             stopTaskRecordingButton.disabled = true;
         });
 
         startIdeaRecordingButton.addEventListener('click', async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            ideaMediaRecorder = new MediaRecorder(stream);
-            ideaMediaRecorder.ondataavailable = event => {
-                ideaAudioChunks.push(event.data);
-            };
-            ideaMediaRecorder.onstop = () => {
-                const audioBlob = new Blob(ideaAudioChunks, { type: 'audio/wav' });
-                const lastIdea = ideas[ideas.length - 1];
-                if (lastIdea) {
-                    lastIdea.audioData = audioBlob;
-                    renderIdeas();
-                }
-                ideaAudioChunks = [];
-            };
-            ideaMediaRecorder.start();
-            startIdeaRecordingButton.disabled = true;
-            stopIdeaRecordingButton.disabled = false;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                ideaMediaRecorder = new MediaRecorder(stream);
+                ideaMediaRecorder.ondataavailable = event => {
+                    ideaAudioChunks.push(event.data);
+                };
+                ideaMediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(ideaAudioChunks, { type: 'audio/wav' });
+                    const lastIdea = ideas[ideas.length - 1];
+                    if (lastIdea) {
+                        lastIdea.audioData = audioBlob;
+                        renderIdeas();
+                    }
+                    ideaAudioChunks = [];
+                };
+                ideaMediaRecorder.start();
+                startIdeaRecordingButton.disabled = true;
+                stopIdeaRecordingButton.disabled = false;
+            } catch (error) {
+                console.error("Error starting idea recording:", error);
+                alert('マイクへのアクセスを許可してください。');
+            }
         });
 
         stopIdeaRecordingButton.addEventListener('click', () => {
-            ideaMediaRecorder.stop();
+            if (ideaMediaRecorder) {
+                ideaMediaRecorder.stop();
+            }
             startIdeaRecordingButton.disabled = false;
-            stopIdeaRecordingButton.disabled
+            stopIdeaRecordingButton.disabled = true;
+        });
+
+        // リマインダー機能 (簡易版)
+        function checkReminders() {
+            tasks.forEach(task => {
+                if (task.dueDate && task.dueTime && !task.completed) {
+                    const now = new Date();
+                    const dueDateTime = new Date(`${task.dueDate}T${task.dueTime}`);
+                    if (dueDateTime <= now) {
+                        alert(`タスク「${task.text}」の期限です！`);
+                    }
+                }
+            });
+        }
+        setInterval(checkReminders, 60000);
+
+        // ページ読み込み時にレンダリング
+        renderTasks();
+        renderIdeas();
+        renderArchivedTasks();
+    </script>
+</body>
+</html>
