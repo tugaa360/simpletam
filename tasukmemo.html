@@ -162,6 +162,46 @@
             margin-bottom: 5px;
             display: block;
         }
+        .tag {
+            background-color: #80deea;
+            color: #000;
+            padding: 5px 10px;
+            border-radius: 12px;
+            margin: 2px 5px;
+            font-size: 12px;
+            display: inline-block;
+        }
+        #tagList {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #tagList span {
+            background-color: #80deea;
+            color: #000;
+            padding: 5px 10px;
+            border-radius: 12px;
+            margin: 2px 5px;
+            font-size: 12px;
+            display: inline-block;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #tagList span:hover {
+            background-color: #4dd0e1;
+        }
+        .tag-input {
+            display: inline-block;
+            width: calc(100% - 120px);
+            padding: 10px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+        }
         @media (max-width: 768px) {
             #ideaList li {
                 width: calc(50% - 20px);
@@ -195,6 +235,7 @@
                 <option value="medium" selected>中</option>
                 <option value="low">低</option>
             </select>
+            <input type="text" id="taskTagsInput" class="tag-input" placeholder="タグをスペース区切りで入力">
             <div>
                 <button id="addTask">追加</button>
                 <button id="startTaskRecording">タスク録音開始</button>
@@ -205,6 +246,7 @@
         <div id="ideas">
             <h2>アイデア</h2>
             <textarea id="ideaInput" placeholder="新しいアイデア"></textarea>
+            <input type="text" id="ideaTagsInput" class="tag-input" placeholder="タグをスペース区切りで入力">
             <div>
                 <button id="addIdea">追加</button>
                 <button id="startIdeaRecording">アイデア録音開始</button>
@@ -213,26 +255,38 @@
             <ul id="ideaList"></ul>
         </div>
     </div>
+    <div id="tagList">
+        <h2>タグ一覧</h2>
+    </div>
     <div id="archivedTasks">
         <h2>完了したタスク</h2>
         <div id="archivedTaskList"></div>
     </div>
     <script>
+        // タスク関連の要素
         const taskInput = document.getElementById('taskInput');
         const taskDueDateInput = document.getElementById('taskDueDate');
-        const taskDueTimeInput = document.getElementById('taskDueTime');
-        const taskPriorityInput = document.getElementById('taskPriority');
+        const taskDueTimeInput = document.getElementById('taskDueTimeInput');
+        const taskPriorityInput = document.getElementById('taskPriorityInput');
+        const taskTagsInput = document.getElementById('taskTagsInput');
         const addTaskButton = document.getElementById('addTask');
         const taskList = document.getElementById('taskList');
-        const ideaInput = document.getElementById('ideaInput');
-        const addIdeaButton = document.getElementById('addIdea');
-        const ideaList = document.getElementById('ideaList');
         const startTaskRecordingButton = document.getElementById('startTaskRecording');
         const stopTaskRecordingButton = document.getElementById('stopTaskRecording');
+
+        // アイデア関連の要素
+        const ideaInput = document.getElementById('ideaInput');
+        const ideaTagsInput = document.getElementById('ideaTagsInput');
+        const addIdeaButton = document.getElementById('addIdea');
+        const ideaList = document.getElementById('ideaList');
         const startIdeaRecordingButton = document.getElementById('startIdeaRecording');
         const stopIdeaRecordingButton = document.getElementById('stopIdeaRecording');
-        const archivedTaskList = document.getElementById('archivedTaskList');
 
+        // 完了したタスク関連の要素
+        const archivedTaskList = document.getElementById('archivedTaskList');
+        const tagListContainer = document.getElementById('tagList');
+
+        // データ
         let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
         let ideas = JSON.parse(localStorage.getItem('ideas')) || [];
         let archivedTasks = JSON.parse(localStorage.getItem('archivedTasks')) || [];
@@ -240,11 +294,31 @@
         let taskMediaRecorder;
         let ideaAudioChunks = [];
         let ideaMediaRecorder;
+        let tags = new Set(JSON.parse(localStorage.getItem('tags')) || []);
 
+        // 音声認識
         const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
         recognition.lang = 'ja-JP';
         recognition.interimResults = true;
 
+        // タグのレンダリング
+        function renderTags() {
+            tagListContainer.innerHTML = '<h2>タグ一覧</h2>';
+            tags.forEach(tag => {
+                const tagSpan = document.createElement('span');
+                tagSpan.className = 'tag';
+                tagSpan.textContent = tag;
+                tagSpan.addEventListener('click', () => {
+                    // タグをクリックしたときの処理（例：タグでフィルタリング）
+                    console.log(`Clicked tag: ${tag}`);
+                    filterByTag(tag); // フィルタリング関数の呼び出し
+                });
+                tagListContainer.appendChild(tagSpan);
+            });
+            localStorage.setItem('tags', JSON.stringify(Array.from(tags)));
+        }
+
+        // タスクのレンダリング
         function renderTasks() {
             taskList.innerHTML = '';
             tasks.forEach((task, index) => {
@@ -254,9 +328,11 @@
                     const audioUrl = URL.createObjectURL(task.audioData);
                     audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
                 }
+                const tagsHtml = task.tags ? task.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
                 li.innerHTML = `
                     <input type="checkbox" id="task-${index}" ${task.completed ? 'checked' : ''}>
                     <label for="task-${index}" class="${task.completed ? 'completed' : ''}">${task.text} (${task.dueDate} ${task.dueTime}) - ${task.priority}</label>
+                    ${tagsHtml}
                     ${audioPlayer}
                     <button class="delete-task" data-index="${index}">削除</button>
                 `;
@@ -265,6 +341,7 @@
             localStorage.setItem('tasks', JSON.stringify(tasks));
         }
 
+        // アイデアのレンダリング
         function renderIdeas() {
             ideaList.innerHTML = '';
             ideas.forEach((idea, index) => {
@@ -274,8 +351,10 @@
                     const audioUrl = URL.createObjectURL(idea.audioData);
                     audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
                 }
+                const tagsHtml = idea.tags ? idea.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
                 li.innerHTML = `
                     <span>${idea.text || idea}</span>
+                    ${tagsHtml}
                     ${audioPlayer}
                     <button class="delete-idea" data-index="${index}">削除</button>
                 `;
@@ -284,6 +363,7 @@
             localStorage.setItem('ideas', JSON.stringify(ideas));
         }
 
+        // 完了したタスクのレンダリング
         function renderArchivedTasks() {
             archivedTaskList.innerHTML = '';
             const groupedTasks = {};
@@ -308,7 +388,8 @@
                         const audioUrl = URL.createObjectURL(task.audioData);
                         audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
                     }
-                    li.innerHTML = `<span class="completed">${task.text} (${task.dueDate} ${task.dueTime}) - ${task.priority}</span> ${audioPlayer}`;
+                    const tagsHtml = task.tags ? task.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
+                    li.innerHTML = `<span class="completed">${task.text} (${task.dueDate} ${task.dueTime}) - ${task.priority}</span> ${tagsHtml} ${audioPlayer}`;
                     ul.appendChild(li);
                 });
                 section.appendChild(ul);
@@ -317,30 +398,54 @@
             localStorage.setItem('archivedTasks', JSON.stringify(archivedTasks));
         }
 
+        // タグの追加
+        function addTags(newTags) {
+            newTags.forEach(tag => {
+                tag = tag.trim();
+                if (tag) {
+                    tags.add(tag);
+                }
+            });
+            renderTags();
+        }
+
+        // タスクの追加
         addTaskButton.addEventListener('click', () => {
             const task = taskInput.value.trim();
             const dueDate = taskDueDateInput.value;
             const dueTime = taskDueTimeInput.value;
             const priority = taskPriorityInput.value;
+            const newTags = taskTagsInput.value.split(' ').filter(tag => tag.trim() !== '');
             if (task) {
-                tasks.push({ text: task, completed: false, dueDate: dueDate, dueTime: dueTime, priority: priority, audioData: null });
+                tasks.push({ text: task, completed: false, dueDate: dueDate, dueTime: dueTime, priority: priority, tags: newTags, audioData: null });
                 taskInput.value = '';
                 taskDueDateInput.value = '';
                 taskDueTimeInput.value = '';
                 taskPriorityInput.value = 'medium';
+                taskTagsInput.value = '';
+                addTags(newTags);
                 renderTasks();
+            } else {
+                alert("タスク名を入力してください。"); // エラーメッセージを表示
             }
         });
 
+        // アイデアの追加
         addIdeaButton.addEventListener('click', () => {
             const idea = ideaInput.value.trim();
+            const newTags = ideaTagsInput.value.split(' ').filter(tag => tag.trim() !== '');
             if (idea) {
-                ideas.push({ text: idea, audioData: null });
+                ideas.push({ text: idea, tags: newTags, audioData: null });
                 ideaInput.value = '';
+                ideaTagsInput.value = '';
+                addTags(newTags);
                 renderIdeas();
+            } else {
+                alert("アイデアを入力してください。"); // エラーメッセージを表示
             }
         });
 
+        // タスクの完了/未完了の切り替え
         taskList.addEventListener('change', (event) => {
             if (event.target.type === 'checkbox') {
                 const index = event.target.id.split('-')[1];
@@ -356,6 +461,7 @@
             }
         });
 
+        // タスクの削除
         taskList.addEventListener('click', (event) => {
             if (event.target.classList.contains('delete-task')) {
                 const index = event.target.dataset.index;
@@ -364,6 +470,7 @@
             }
         });
 
+        // アイデアの削除
         ideaList.addEventListener('click', (event) => {
             if (event.target.classList.contains('delete-idea')) {
                 const index = event.target.dataset.index;
@@ -372,6 +479,7 @@
             }
         });
 
+        // タスクの録音開始
         startTaskRecordingButton.addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -397,6 +505,7 @@
             }
         });
 
+        // タスクの録音停止
         stopTaskRecordingButton.addEventListener('click', () => {
             if (taskMediaRecorder) {
                 taskMediaRecorder.stop();
@@ -405,6 +514,7 @@
             stopTaskRecordingButton.disabled = true;
         });
 
+        // アイデアの録音開始
         startIdeaRecordingButton.addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -430,6 +540,7 @@
             }
         });
 
+        // アイデアの録音停止
         stopIdeaRecordingButton.addEventListener('click', () => {
             if (ideaMediaRecorder) {
                 ideaMediaRecorder.stop();
@@ -437,6 +548,49 @@
             startIdeaRecordingButton.disabled = false;
             stopIdeaRecordingButton.disabled = true;
         });
+
+        // タグによるフィルタリング
+        function filterByTag(tag) {
+            const filteredTasks = tasks.filter(task => task.tags && task.tags.includes(tag));
+            const filteredIdeas = ideas.filter(idea => idea.tags && idea.tags.includes(tag));
+
+            taskList.innerHTML = '';
+            filteredTasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                let audioPlayer = '';
+                if (task.audioData) {
+                    const audioUrl = URL.createObjectURL(task.audioData);
+                    audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
+                }
+                const tagsHtml = task.tags ? task.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
+                li.innerHTML = `
+                    <input type="checkbox" id="task-${index}" ${task.completed ? 'checked' : ''}>
+                    <label for="task-${index}" class="${task.completed ? 'completed' : ''}">${task.text} (${task.dueDate} ${task.dueTime}) - ${task.priority}</label>
+                    ${tagsHtml}
+                    ${audioPlayer}
+                    <button class="delete-task" data-index="${index}">削除</button>
+                `;
+                taskList.appendChild(li);
+            });
+
+            ideaList.innerHTML = '';
+            filteredIdeas.forEach((idea, index) => {
+                const li = document.createElement('li');
+                let audioPlayer = '';
+                if (idea.audioData) {
+                    const audioUrl = URL.createObjectURL(idea.audioData);
+                    audioPlayer = `<audio src="${audioUrl}" controls></audio>`;
+                }
+                const tagsHtml = idea.tags ? idea.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
+                li.innerHTML = `
+                    <span>${idea.text || idea}</span>
+                    ${tagsHtml}
+                    ${audioPlayer}
+                    <button class="delete-idea" data-index="${index}">削除</button>
+                `;
+                ideaList.appendChild(li);
+            });
+        }
 
         // リマインダー機能 (簡易版)
         function checkReminders() {
@@ -453,6 +607,7 @@
         setInterval(checkReminders, 60000);
 
         // ページ読み込み時にレンダリング
+        renderTags();
         renderTasks();
         renderIdeas();
         renderArchivedTasks();
